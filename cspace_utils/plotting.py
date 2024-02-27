@@ -30,7 +30,7 @@ def sorted_vertices(vpoly):
     return vpoly.vertices()[:, sorted_index]
 
 
-def plot_HPoly(ax, HPoly, color = None, zorder = 0):
+def plot_hpoly_matplotlib(ax, HPoly, color = None, zorder = 0):
     v = sorted_vertices(VPolytope(HPoly)).T#s
     v = np.concatenate((v, v[0,:].reshape(1,-1)), axis=0)
     if color is None:
@@ -40,9 +40,16 @@ def plot_HPoly(ax, HPoly, color = None, zorder = 0):
 
     ax.fill(v[:,0], v[:,1], alpha = 0.5, c = p[0].get_color(), zorder = zorder)
 
+def plot_hpoly_skeleton_matplotlib(ax, HPoly, color = None, zorder = 0):
+    v = sorted_vertices(VPolytope(HPoly)).T#s
+    v = np.concatenate((v, v[0,:].reshape(1,-1)), axis=0)
+    if color is None:
+        p = ax.plot(v[:,0], v[:,1], linewidth = 2, alpha = 0.7, zorder = zorder)
+    else:
+        p = ax.plot(v[:,0], v[:,1], linewidth = 2, alpha = 0.7, c = color, zorder = zorder)
 
 
-def plot_ellipse(ax, H, n_samples, color = None, linewidth = 1):
+def plot_ellipse(ax, H, n_samples= 50, color = None, linewidth = 1):
     A = H.A()
     center = H.center()
     angs = np.linspace(0, 2*np.pi, n_samples+1)
@@ -55,6 +62,19 @@ def plot_ellipse(ax, H, n_samples, color = None, linewidth = 1):
         ax.plot(pts[0, :], pts[1, :], linewidth = linewidth)
     else:
         ax.plot(pts[0, :], pts[1, :], linewidth = linewidth, color = color)
+
+def plot_2d_ellipse_meshcat(meshcat, H:Hyperellipsoid, name, n_samples= 50, color = Rgba(0,0,0,1), size = 0.001, translation= np.zeros(3)):
+    assert H.ambient_dimension()==2
+    A = H.A()
+    center = H.center()
+    angs = np.linspace(0, 2*np.pi, n_samples+1)
+    coords = np.zeros((2, n_samples + 1))
+    coords[0, :] = np.cos(angs)
+    coords[1, :] = np.sin(angs)
+    Bu = np.linalg.inv(A)@coords
+    pts = Bu + center.reshape(2,1)
+    edges = [[pts[:, i], pts[:, i+1]] for i in range(pts.shape[1]-1)]
+    plot_edges(meshcat, edges, name, color,size, translation)
 
 def plot_ellipse_homogenous_rep(ax, Emat, xrange, yrange, resolution, linewidth =1, color = 'b', zorder = 1,):
     # center = np.linalg.solve(-Emat[:-1, :-1], Emat[-1, :-1])
@@ -256,9 +276,9 @@ def plot_ellipses(meshcat, ellipses, name, colors, offset = None):
     for i, e in enumerate(ellipses):
         c = colors[i]
         prefix = f"/{name}/ellipses/{i}"
-        plot_ellipse(meshcat, prefix, e, c, offset)
+        plot_ellipse_meshcat(meshcat, prefix, e, c, offset)
 
-def plot_ellipse( meshcat, name, ellipse, color, offset = None):
+def plot_ellipse_meshcat( meshcat, name, ellipse, color, offset = None):
     
         shape, pose = ellipse.ToShapeWithPose()
         if offset is not None:
@@ -337,3 +357,116 @@ def get_shunk_plotter(plant, scene_graph, plant_context, diagram_context):
             plot_endeff_pose(meshcat, q, prefix+f"_{i}", color)
     
     return plot_endeff_poses
+
+
+#visibility graphs
+def compute_rotation_matrix(a, b):
+    # Normalize the points
+    a = a / np.linalg.norm(a)
+    b = b / np.linalg.norm(b)
+    
+    # Calculate the rotation axis
+    rotation_axis = np.cross(a, b)
+    rotation_axis /= np.linalg.norm(rotation_axis)
+    
+    # Calculate the rotation angle
+    dot_product = np.dot(a, b)
+    rotation_angle = np.arccos(np.clip(dot_product, -1.0, 1.0))
+    
+    # Construct the rotation matrix using Rodrigues' formula
+    skew_matrix = np.array([[0, -rotation_axis[2], rotation_axis[1]],
+                            [rotation_axis[2], 0, -rotation_axis[0]],
+                            [-rotation_axis[1], rotation_axis[0], 0]])
+    rotation_matrix = np.eye(3) + np.sin(rotation_angle) * skew_matrix + (1 - np.cos(rotation_angle)) * np.dot(skew_matrix, skew_matrix)
+    
+    return rotation_matrix
+
+def plot_edge(meshcat, pt1, pt2, name, color, translation = np.zeros(3), size = 0.01):
+    meshcat.SetObject(name,
+                        Cylinder(size, np.linalg.norm(pt1-pt2)),
+                        color)
+    assert len(pt1) == len(pt2)
+    pt1 = (stretch_array_to_3d(pt1)).squeeze()
+    pt2 = (stretch_array_to_3d(pt2)).squeeze()
+    assert len(pt1) == len(pt2) ==3
+    dir = pt2-pt1
+    rot = compute_rotation_matrix(np.array([0,0,1]), dir )
+    offs = rot@np.array([0,0,np.linalg.norm(pt1-pt2)/2])
+    meshcat.SetTransform(name, 
+                        RigidTransform(
+                        RotationMatrix(rot), 
+                        np.array(pt1)+offs+translation))
+
+def plot_edges(meshcat, edges, name, color = Rgba(0,0,0,1), size = 0.01, translation= np.zeros(3)):
+    for i, e in enumerate(edges):
+         plot_edge(meshcat, 
+                   e[0], 
+                   e[1], 
+                   name + f"/e_{i}", 
+                   color= color, 
+                   size=size, 
+                   translation=translation)
+
+def plot_visibility_graph(meshcat, 
+                          points, 
+                          ad_mat,
+                          name,
+                          color = Rgba(0,0,0,1), 
+                          size = 0.01,
+                          translation = np.zeros(3)):
+    edges = []
+    N = ad_mat.shape[0]
+    for i in range(N):
+        for j in range(i+1, N):
+            if ad_mat[i,j]:
+                edges.append([points[i,:], points[j,:]])
+    plot_edges(meshcat, edges, name, color, size, translation)
+
+def get_edges_clique(clique, points, downsampling):
+    edges = []
+    for i,c1 in enumerate(clique[:-1]):
+        for c2 in clique[i+1:]:
+            edges.append([points[c1, :], points[c2,:]])
+    if len(edges)>200:
+        edges = edges[::downsampling]
+    return edges
+
+def plot_edges_clique(meshcat,
+                      clique, 
+                      points, 
+                      name,
+                      color = Rgba(0,0,0,1), 
+                      size = 0.01,
+                      translation = np.zeros(3)):
+    edges = get_edges_clique(clique, points)
+    plot_edges(meshcat, edges, name, color, size, translation)
+
+from cspace_utils.colors import generate_maximally_different_colors
+
+def plot_cliuqes(meshcat,
+                 cliques,
+                 points,
+                 name,
+                 size = 0.01,
+                 translation= np.zeros(3),
+                 downsampling=10
+                 ):
+    cl_edges = []
+    for cl in cliques:
+        cl_edges.append(get_edges_clique(cl, points, downsampling))
+
+    colors = [Rgba(c[0], c[1], c[2], 1.) for c in generate_maximally_different_colors(len(cliques))]
+    for i, cl_e in enumerate(cl_edges):
+        plot_edges(meshcat, 
+                   cl_e, 
+                   name+f"/cl_e{i}", 
+                   color=colors[i], 
+                   size = size, 
+                   translation=translation)
+    
+# def get_edges_clique(cl, points):
+#     e = []
+#     for i,c1 in enumerate(cl[:-1]):
+#         for c2 in cl[i+1:]:
+#             e.append([points[c1, :], points[c2,:]])
+#     return e
