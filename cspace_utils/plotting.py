@@ -40,6 +40,15 @@ def plot_hpoly_matplotlib(ax, HPoly, color = None, zorder = 0):
 
     ax.fill(v[:,0], v[:,1], alpha = 0.5, c = p[0].get_color(), zorder = zorder)
 
+def plot_vpoly_2d_meshcat(meshcat, vpoly: VPolytope,name, color = None, size = 0.01, translation = np.zeros(3)):
+    assert vpoly.ambient_dimension() ==2
+    v = sorted_vertices(vpoly).T#s
+    v = np.concatenate((v, v[0,:].reshape(1,-1)), axis=0)
+    edges = [ [v[i, :], v[i+1, :]]for i in range(len(v)-1)]
+    
+    plot_edges(meshcat, edges, name=name, size = size, translation= translation, color=color)
+
+
 def plot_hpoly_skeleton_matplotlib(ax, HPoly, color = None, zorder = 0):
     v = sorted_vertices(VPolytope(HPoly)).T#s
     v = np.concatenate((v, v[0,:].reshape(1,-1)), axis=0)
@@ -443,19 +452,21 @@ def plot_edges_clique(meshcat,
 
 from cspace_utils.colors import generate_maximally_different_colors
 
-def plot_cliuqes(meshcat,
+def plot_cliques(meshcat,
                  cliques,
                  points,
                  name,
                  size = 0.01,
                  translation= np.zeros(3),
-                 downsampling=10
+                 downsampling=10,
+                 colors = None
                  ):
     cl_edges = []
     for cl in cliques:
         cl_edges.append(get_edges_clique(cl, points, downsampling))
 
-    colors = [Rgba(c[0], c[1], c[2], 1.) for c in generate_maximally_different_colors(len(cliques))]
+    if colors is None:
+        colors = [Rgba(c[0], c[1], c[2], 1.) for c in generate_maximally_different_colors(len(cliques))]
     for i, cl_e in enumerate(cl_edges):
         plot_edges(meshcat, 
                    cl_e, 
