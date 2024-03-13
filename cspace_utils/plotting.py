@@ -18,6 +18,7 @@ from cspace_utils.geometry import (arrange_homogeneous_ellipse_matrix_to_vector,
                                    get_AABB_limits,
                                    get_AABB_limits_hyperelliposid)
 from cspace_utils.colors import (generate_maximally_different_colors)
+
 import numpy as np
 from functools import partial
 import mcubes
@@ -450,7 +451,6 @@ def plot_edges_clique(meshcat,
     edges = get_edges_clique(clique, points)
     plot_edges(meshcat, edges, name, color, size, translation)
 
-from cspace_utils.colors import generate_maximally_different_colors
 
 def plot_cliques(meshcat,
                  cliques,

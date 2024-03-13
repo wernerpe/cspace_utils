@@ -9,7 +9,8 @@ from pydrake.all import (Hyperellipsoid,
                          VPolytope,
                          PiecewisePolynomial,
                          SolverOptions,
-                         CommonSolverOption)
+                         CommonSolverOption,
+                         HPolyhedron)
 import pydrake.symbolic as sym
 
 def switch_ellipse_description(A, b):
@@ -97,6 +98,13 @@ def get_AABB_limits(hpoly, dim=3):
         result = Solve(aabbprog)
         max_limits.append(-result.get_optimal_cost() + 0.01)
     return max_limits, min_limits
+
+
+def get_AABB_cvxhull(regions):
+    vps = [VPolytope(r).vertices().T for r in regions]
+    cvxh = HPolyhedron(VPolytope(np.concatenate(tuple(vps), axis=0).T))
+    max, min = get_AABB_limits(cvxh, dim = 3)    
+    return np.array(min), np.array(max), cvxh
 
 def get_AABB_limits_hyperelliposid(hell: Hyperellipsoid):
     dim = hell.ambient_dimension()
@@ -228,3 +236,4 @@ def polynomial_distance_function_approx(vpoly : VPolytope,
     else:
         print(f"Distance function approximation failed.")
         return None, None
+    

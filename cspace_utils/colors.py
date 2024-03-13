@@ -2,7 +2,8 @@ import random
 import colorsys
 from fractions import Fraction
 import itertools
-
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 def generate_maximally_different_colors(n):
     """
     Generate n maximally different random colors for matplotlib.
@@ -66,3 +67,11 @@ def n_colors(n=33, rgbs_ret = False):
     csss = (rgb_to_css(rgb) for rgb in rgbs)
     to_ret = list(itertools.islice(csss, n)) if rgbs_ret else list(itertools.islice(csss, n))
     return to_ret
+
+def generate_distinct_colors(n, rgb = False):
+    cmap = plt.cm.get_cmap('hsv', n)  # Choose a colormap
+    colors = [mcolors.rgb2hex(cmap(i)[:3]) for i in range(n)]  # Convert colormap to hexadecimal colors
+    if rgb:
+        return [hex_to_rgb(c) for c in colors]
+    else:
+        return colors
