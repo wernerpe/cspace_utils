@@ -99,6 +99,31 @@ def plot_ellipse_homogenous_rep(ax, Emat, xrange, yrange, resolution, linewidth 
     CS = ax.contour(X, Y, Z,[1.0], linewidths = linewidth,zorder = zorder, colors = [color])
     return CS
 
+def plot_star(ax, 
+              location, 
+              color = 'k', 
+              fillcolor = 'yellow', 
+              linewidth =1, 
+              scale =1, 
+              n_points=5, 
+              radius1=1, 
+              radius2=0.4):
+    def create_star(location, n_points=5, radius1=1, radius2=0.4, scale =1):
+        angles = np.linspace(0, 2 * np.pi, 2 * n_points, endpoint=False)
+        points = []
+        for i in range(2 * n_points):
+            r = radius1 if i % 2 == 0 else radius2
+            x = r * np.cos(angles[i]+np.pi/2)
+            y = r * np.sin(angles[i]+np.pi/2)
+            points.append([x, y])
+        points.append(points[0])  # Closing the star shape
+        return scale*np.array(points)+location.reshape(1,-1)
+    star_points = create_star(location, n_points, radius1, radius2, scale)
+    ax.plot(star_points[:, 0], star_points[:, 1], color, linewidth)  # Blue solid line
+    if fillcolor is not None:
+        ax.fill(star_points[:, 0], star_points[:, 1], fillcolor, alpha=0.5)  # Fill with color
+
+
 
 def plot_surface(meshcat_instance,
                  path,
@@ -432,6 +457,26 @@ def plot_visibility_graph(meshcat,
                 edges.append([points[i,:], points[j,:]])
     plot_edges(meshcat, edges, name, color, size, translation)
 
+def plot_graph_matplotlib(ax, 
+                          points, 
+                          ad_mat,
+                          node_color = 'k',
+                          edge_color = 'k', 
+                          linewidth = 10,
+                          nodesize = 10):
+    edges = []
+    N = ad_mat.shape[0]
+    for i in range(N):
+        for j in range(i+1, N):
+            if ad_mat[i,j]:
+                edges.append([points[i,:], points[j,:]])
+    ax.scatter(points[:,0], points[:,1], s = nodesize, c = node_color)
+    plot_edges_matplotlib(ax, edges, edge_color, linewidth)
+
+def plot_edges_matplotlib(ax, edges, edge_color = 'k', linewidth=1):
+    for e in edges:
+        ax.plot([e[0][0], e[1][0]], [e[0][1], e[1][1]], color = edge_color, linewidth = linewidth)
+        
 def get_edges_clique(clique, points, downsampling):
     edges = []
     for i,c1 in enumerate(clique[:-1]):

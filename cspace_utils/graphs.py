@@ -46,3 +46,4 @@ def compute_greedy_clique_partition(adj_mat, min_cliuqe_size, worklimit =100):
         if len(adj_curr) == 0 or len(cliques[-1])<min_cliuqe_size:
             done = True
     return cliques
+
