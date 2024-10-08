@@ -94,3 +94,37 @@ def find_clique_cover_nx(G, min_clique_size = 8):
 def double_greedy_clique_cover_nx(adjacency_matrix, min_clique_size = 8):
     nxg = adjacency_matrix_to_nxgraph(adjacency_matrix)
     return find_clique_cover_nx(nxg, min_clique_size)  
+
+from typing import Union
+from scipy.sparse import csc_matrix
+
+def greedy_clique_cover(adjacency_matrix: Union[np.ndarray, csc_matrix], 
+                        min_clique_size: int = 1, 
+                        approach: str = 'dr', 
+                        worklimit_mip: int = 100):
+    assert approach in ['dr', 'nx', 'mip']
+    '''
+    Computes a trucnated clique cover (may not cover all nodes if min clique 
+    size is larger than 1). 
+    
+    All clique covers are computed greedily using the iterative 
+    clique removal strategy.
+
+    dr: drake MaxCliqueSolverViaGreedy
+    nx: networkx approximation max_clique
+    mip: uses gurobi and drake to compute the maximum clique at every step
+    '''
+    
+    if approach == 'dr':
+        return double_greedy_clique_cover(adjacency_matrix, min_clique_size)
+    if approach == 'nx':
+        if isinstance(adjacency_matrix, csc_matrix):
+            adjacency_matrix = adjacency_matrix.toarray()
+        return double_greedy_clique_cover_nx(adjacency_matrix, min_clique_size)
+    if approach == 'mip':
+        if isinstance(adjacency_matrix, csc_matrix):
+            adjacency_matrix = adjacency_matrix.toarray()
+        return compute_greedy_clique_partition(adjacency_matrix, 
+                                               min_clique_size,
+                                               worklimit=worklimit_mip)
+    raise ValueError("Invalid approach")
