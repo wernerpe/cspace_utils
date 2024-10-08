@@ -41,7 +41,11 @@ def plot_hpoly_matplotlib(ax, HPoly, color = None, zorder = 0):
 
     ax.fill(v[:,0], v[:,1], alpha = 0.5, c = p[0].get_color(), zorder = zorder)
 
-def plot_vpoly_2d_meshcat(meshcat, vpoly: VPolytope,name, color = None, size = 0.01, translation = np.zeros(3)):
+def plot_vpoly_2d_meshcat(meshcat, 
+                          vpoly: VPolytope,
+                          name, color = None, 
+                          size = 0.01, 
+                          translation = np.zeros(3)):
     assert vpoly.ambient_dimension() ==2
     v = sorted_vertices(vpoly).T#s
     v = np.concatenate((v, v[0,:].reshape(1,-1)), axis=0)
@@ -107,7 +111,8 @@ def plot_star(ax,
               scale =1, 
               n_points=5, 
               radius1=1, 
-              radius2=0.4):
+              radius2=0.4,
+              zorder = 0):
     def create_star(location, n_points=5, radius1=1, radius2=0.4, scale =1):
         angles = np.linspace(0, 2 * np.pi, 2 * n_points, endpoint=False)
         points = []
@@ -119,9 +124,9 @@ def plot_star(ax,
         points.append(points[0])  # Closing the star shape
         return scale*np.array(points)+location.reshape(1,-1)
     star_points = create_star(location, n_points, radius1, radius2, scale)
-    ax.plot(star_points[:, 0], star_points[:, 1], color, linewidth)  # Blue solid line
+    ax.plot(star_points[:, 0], star_points[:, 1], color, linewidth, zorder = zorder)  # Blue solid line
     if fillcolor is not None:
-        ax.fill(star_points[:, 0], star_points[:, 1], fillcolor, alpha=0.5)  # Fill with color
+        ax.fill(star_points[:, 0], star_points[:, 1], fillcolor, alpha=0.5, zorder = zorder)  # Fill with color
 
 
 
@@ -463,21 +468,22 @@ def plot_graph_matplotlib(ax,
                           node_color = 'k',
                           edge_color = 'k', 
                           linewidth = 10,
-                          nodesize = 10):
+                          nodesize = 10, 
+                          zorder = 0):
     edges = []
     N = ad_mat.shape[0]
     for i in range(N):
         for j in range(i+1, N):
             if ad_mat[i,j]:
                 edges.append([points[i,:], points[j,:]])
-    ax.scatter(points[:,0], points[:,1], s = nodesize, c = node_color)
+    ax.scatter(points[:,0], points[:,1], s = nodesize, c = node_color, zorder = zorder)
     plot_edges_matplotlib(ax, edges, edge_color, linewidth)
 
-def plot_edges_matplotlib(ax, edges, edge_color = 'k', linewidth=1):
+def plot_edges_matplotlib(ax, edges, edge_color = 'k', linewidth=1, zorder = 0):
     for e in edges:
-        ax.plot([e[0][0], e[1][0]], [e[0][1], e[1][1]], color = edge_color, linewidth = linewidth)
+        ax.plot([e[0][0], e[1][0]], [e[0][1], e[1][1]], color = edge_color, linewidth = linewidth, zorder = zorder)
         
-def get_edges_clique(clique, points, downsampling):
+def get_edges_clique(clique, points, downsampling = 3):
     edges = []
     for i,c1 in enumerate(clique[:-1]):
         for c2 in clique[i+1:]:
