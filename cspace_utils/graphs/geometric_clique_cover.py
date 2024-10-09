@@ -9,11 +9,26 @@ from pydrake.all import (MathematicalProgram,
                          ge,
                          eq)
 from .geom_clique_cover_helpers import max_clique_iterative_cvx_h_constraint
+from .greedy_max_geom_clique import greedy_max_geometric_clique
 
-
-def iterative_greedy_max_geom_clique_cover(a,b,c):
-    raise NotImplementedError('')
-
+def iterative_greedy_max_geom_clique_cover(adjacency_matrix,
+                                           vertex_positions,
+                                           min_gain_per_clique,
+                                           ):
+    assert adjacency_matrix.shape[0] == vertex_positions.shape[1]
+    cliques = []
+    done = False
+    ind_curr = np.arange(len(adjacency_matrix))
+    c = np.ones((adjacency_matrix.shape[0],))
+    while not done:
+        val, ind_max_clique = greedy_max_geometric_clique(adjacency_matrix, 
+                                                          vertex_positions.T,
+                                                          c)
+        c[ind_max_clique] = 0
+        cliques.append(np.array(ind_max_clique).reshape(-1))
+        if val< min_gain_per_clique or np.sum(c) == 0:
+            done = True
+    return cliques
 
 def cutting_planes_geometric_clique_cover(adjacency_matrix,
                                           vertex_positions,
@@ -42,7 +57,7 @@ def greedy_geometric_clique_cover(adjacency_matrix: Union[np.ndarray, csc_matrix
                                   approach: str = 'cutting', 
                                   worklimit_mip: int = 100):
     assert approach in ['greedy', 'cutting']
-    #this is a sanity check, the first dimension is the ambient dimension of the space
+    #this is a sanity check, the second dimension is the ambient dimension of the space
     if vertex_positions.shape[1] != adjacency_matrix.shape[1]:
         raise ValueError(f"""You likely forgot to transpose the vertex positions. 
                          They are interpreted as {vertex_positions.shape[1]} 

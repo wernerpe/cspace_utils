@@ -76,19 +76,29 @@ def compute_wki_and_values(clique, adj_mat, candidates_sorted, pts):
                 w_ki_sorted.append(pts_in_cvxh)
             else:
                 print('invalid_spanning_point')
-                w_ki_sorted.append([-1])
+                v_ki[current_candidate_idx] = -1
+                w_ki_sorted.append([])
     return w_ki_sorted, v_ki
 
 import time 
 
 def greedy_max_geometric_clique(adj_mat,
-                                pts):
-    
+                                pts,
+                                c = None):
+    assert adj_mat.shape[0] == pts.shape[0]
+    #this only supports c = {0,1}^N
     if isinstance(adj_mat, csc_matrix):
         adj_mat = adj_mat.toarray()
     degrees = adj_mat.sum(axis=1)
     candidates = np.argsort(degrees)[::-1]
+    if c is not None:
+        assert len(c) == len(pts)
+        #extract non zero candidates
+        csorted = c[candidates]
+        candidates = np.delete(candidates, np.where(csorted == 0)[0])
+
     current_clique = []
+    original_candidates = candidates.copy()
     #do N steps greedy
     for _ in range(pts.shape[1]):
         current_clique.append(candidates[0])
@@ -97,9 +107,7 @@ def greedy_max_geometric_clique(adj_mat,
     
     while len(candidates):
         print(f"candidates {len(candidates)}")
-        t1 = time.time()
         w_ki, v_ki = compute_wki_and_values(current_clique, adj_mat, candidates, pts)
-        t2 = time.time()
         if np.all(v_ki ==0):
             break
         # print(f"wki {w_ki}")
@@ -117,9 +125,10 @@ def greedy_max_geometric_clique(adj_mat,
         current_clique = current_clique + w_ki[best_cand]
         candidates = remove_disproven_candidates(w_ki, candidates)
         candidates = update_candidates(w_ki[best_cand], candidates, adj_mat)
-        t3 = time.time()
         iter+=1
-        break
-    print(f"t12 {t2-t1}")
-    print(f"t23 {t3-t2}")
-    return current_clique
+        
+    num_cands_added = 0
+    for c in current_clique:
+        if c in original_candidates:
+            num_cands_added+=1
+    return num_cands_added, current_clique 
