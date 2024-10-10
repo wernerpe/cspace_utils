@@ -13,11 +13,11 @@ def update_candidates(points_to_add, cands, adm):
             new_candidates.append(cand)
     return new_candidates
 
-def remove_disproven_candidates(w_ki, cands):
+def remove_disproven_candidates(w_ki, v_ki, cands):
     new_cands = []
     num = 0
-    for w,c in zip(w_ki, cands):
-        if len(w)==0 or not w[0]==-1:
+    for w,v,c in zip(w_ki,v_ki, cands):
+        if len(w)==0 or not v==-1:
             new_cands.append(c)
             num+=1
     print(num)
@@ -103,6 +103,8 @@ def greedy_max_geometric_clique(adj_mat,
     for _ in range(pts.shape[1]):
         current_clique.append(candidates[0])
         candidates = update_candidates([candidates[0]], candidates, adj_mat)
+        if len(candidates) ==0:
+            break
     iter = 0
     
     while len(candidates):
@@ -114,6 +116,8 @@ def greedy_max_geometric_clique(adj_mat,
         # print(f"vki {v_ki}")
         
         max_vki = np.max(v_ki)
+        if max_vki ==-1:
+            break
         best_pts = np.where(v_ki==max_vki)[0]
         if len(best_pts>1):
             degrees_of_best_pts = [degrees[candidates[pt]] for pt in best_pts]
@@ -123,7 +127,7 @@ def greedy_max_geometric_clique(adj_mat,
             best_cand = best_pts[0]
         # point_to_add = candidates[best_cand]
         current_clique = current_clique + w_ki[best_cand]
-        candidates = remove_disproven_candidates(w_ki, candidates)
+        candidates = remove_disproven_candidates(w_ki,v_ki, candidates)
         candidates = update_candidates(w_ki[best_cand], candidates, adj_mat)
         iter+=1
         

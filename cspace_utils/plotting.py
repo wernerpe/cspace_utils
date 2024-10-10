@@ -103,6 +103,52 @@ def plot_ellipse_homogenous_rep(ax, Emat, xrange, yrange, resolution, linewidth 
     CS = ax.contour(X, Y, Z,[1.0], linewidths = linewidth,zorder = zorder, colors = [color])
     return CS
 
+def plot_ellipse_homogenous_rep_meshcat(meshcat, Emat, name, xrange, yrange, resolution, size =0.01, color = Rgba(0,0,0,1), zorder = 1,):
+    # center = np.linalg.solve(-Emat[:-1, :-1], Emat[-1, :-1])
+    # max = np.max(1/(np.sqrt(np.linalg.eigh(Emat[:-1, :-1])[0] + 1e-3)))
+    # if clip is None:
+    #     clip = [-10,10]
+    x = np.arange(xrange[0], xrange[1], resolution)
+    y = np.arange(yrange[0], yrange[1], resolution)
+    X,Y = np.meshgrid(x,y)
+    hE = arrange_homogeneous_ellipse_matrix_to_vector(Emat)
+    Z = (hE@build_quadratic_features(np.concatenate((X.reshape(-1,1), Y.reshape(-1,1)), axis = 1)).T).reshape(len(y), len(x))
+    # CS = ax.contour(X, Y, Z,[1.0], linewidths = linewidth,zorder = zorder, colors = [color])
+    ATA = Emat[:-1, :-1]
+    max_eig = 10*np.max(np.linalg.eig(ATA)[0])
+    adjustment = np.min([max_eig, 0.1])
+    print(adjustment)
+    idx1 = np.where(Z.flatten()<=1.001 + adjustment)[0]
+    idx2 = np.where(Z.flatten()>=0.99999)[0]
+    idx = np.intersect1d(idx1, idx2)
+    x = X.flatten()[idx]
+    y = Y.flatten()[idx]
+    pts = np.concatenate((x.reshape(-1,1),y.reshape(-1,1), 0*y.reshape(-1,1)), axis = 1)
+    plot_points(meshcat, pts, name, size=size, color = color)
+
+# def plot_ellipse_homogenous_rep_meshcat2(meshcat, he, name, xrange, yrange, resolution, size =0.01, color = Rgba(0,0,0,1), zorder = 1,):
+#     # center = np.linalg.solve(-Emat[:-1, :-1], Emat[-1, :-1])
+#     # max = np.max(1/(np.sqrt(np.linalg.eigh(Emat[:-1, :-1])[0] + 1e-3)))
+#     # if clip is None:
+#     #     clip = [-10,10]
+#     x = np.arange(xrange[0], xrange[1], resolution)
+#     y = np.arange(yrange[0], yrange[1], resolution)
+#     X,Y = np.meshgrid(x,y)
+#     Z = 0*X
+#     for ix in range(X.shape[0]):
+#         for iy in range(X.shape[0]):
+#             pt = np.array([X[ix,iy], Y[ix,iy]]).reshape(-1,1)
+#             Z[ix,iy] = (pt-he.center().reshape(-1,1)).T@he.A().T@he.A()@(pt-he.center().reshape(-1,1))
+#     # CS = ax.contour(X, Y, Z,[1.0], linewidths = linewidth,zorder = zorder, colors = [color])
+    
+#     idx1 = np.where(Z.flatten()<=1.05)[0]
+#     idx2 = np.where(Z.flatten()>=0.999999)[0]
+#     idx = np.intersect1d(idx1, idx2)
+#     x = X.flatten()[idx]
+#     y = Y.flatten()[idx]
+#     pts = np.concatenate((x.reshape(-1,1),y.reshape(-1,1), 0*y.reshape(-1,1)), axis = 1)
+#     plot_points(meshcat, pts, name, size=size, color = color)
+    
 def plot_star(ax, 
               location, 
               color = 'k', 

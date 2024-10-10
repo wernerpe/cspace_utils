@@ -10,10 +10,12 @@ from pydrake.all import (MathematicalProgram,
                          eq)
 from .geom_clique_cover_helpers import max_clique_iterative_cvx_h_constraint
 from .greedy_max_geom_clique import greedy_max_geometric_clique
-
+from .max_geom_clique_with_ellipsoidal_convex_hull_constraint import compute_greedy_clique_cover_w_ellipsoidal_convex_hull_constraint
+from .greedy_max_geom_clique2 import greedy_max_geometric_clique2
 def iterative_greedy_max_geom_clique_cover(adjacency_matrix,
                                            vertex_positions,
                                            min_gain_per_clique,
+                                           use_two = True
                                            ):
     assert adjacency_matrix.shape[0] == vertex_positions.shape[1]
     cliques = []
@@ -21,9 +23,14 @@ def iterative_greedy_max_geom_clique_cover(adjacency_matrix,
     ind_curr = np.arange(len(adjacency_matrix))
     c = np.ones((adjacency_matrix.shape[0],))
     while not done:
-        val, ind_max_clique = greedy_max_geometric_clique(adjacency_matrix, 
+        if use_two:
+            val, ind_max_clique = greedy_max_geometric_clique(adjacency_matrix, 
                                                           vertex_positions.T,
                                                           c)
+        else:
+            val, ind_max_clique = greedy_max_geometric_clique(adjacency_matrix, 
+                                                            vertex_positions.T,
+                                                            c)
         c[ind_max_clique] = 0
         cliques.append(np.array(ind_max_clique).reshape(-1))
         if val< min_gain_per_clique or np.sum(c) == 0:
@@ -33,7 +40,7 @@ def iterative_greedy_max_geom_clique_cover(adjacency_matrix,
 def cutting_planes_geometric_clique_cover(adjacency_matrix,
                                           vertex_positions,
                                           min_gain_per_clique,
-                                          worklimit_mip = 0):
+                                          worklimit_mip = 100):
     
     assert adjacency_matrix.shape[0] == vertex_positions.shape[1]
     cliques = []
@@ -51,12 +58,23 @@ def cutting_planes_geometric_clique_cover(adjacency_matrix,
             done = True
     return cliques
 
+def ellipsoid_geometric_clique_cover(adjacency_matrix,
+                                     vertex_positions,
+                                     min_gain_per_clique,
+                                     worklimit_mip = 100):
+    cliques, elliposids = compute_greedy_clique_cover_w_ellipsoidal_convex_hull_constraint(adjacency_matrix,
+                                                                                           vertex_positions,
+                                                                                           min_gain_per_clique,
+                                                                                           50,
+                                                                                           1.1)
+    return cliques, elliposids
+
 def greedy_geometric_clique_cover(adjacency_matrix: Union[np.ndarray, csc_matrix], 
                                   vertex_positions: np.ndarray,
                                   min_gain_per_clique: int = 1, 
                                   approach: str = 'cutting', 
                                   worklimit_mip: int = 100):
-    assert approach in ['greedy', 'cutting']
+    assert approach in ['greedy','greedy2', 'cutting', 'ellipsoid']
     #this is a sanity check, the second dimension is the ambient dimension of the space
     if vertex_positions.shape[1] != adjacency_matrix.shape[1]:
         raise ValueError(f"""You likely forgot to transpose the vertex positions. 
@@ -71,7 +89,8 @@ def greedy_geometric_clique_cover(adjacency_matrix: Union[np.ndarray, csc_matrix
     candidates is set to zero.
 
     greedy: uses greedy max geometric clique algorithm
-    cutting: uses iterative cutting approach 
+    cutting: uses iterative cutting approach
+    ellipsoidal: uses approximated ellipsoidal decision boundaries. 
     '''
     
     if approach == 'greedy':
@@ -79,13 +98,27 @@ def greedy_geometric_clique_cover(adjacency_matrix: Union[np.ndarray, csc_matrix
             adjacency_matrix = adjacency_matrix.toarray()
         return iterative_greedy_max_geom_clique_cover(adjacency_matrix, 
                                                       vertex_positions, 
-                                                      min_gain_per_clique)
+                                                      min_gain_per_clique,
+                                                      use_two=False), None
+    if approach == 'greedy2':
+        if isinstance(adjacency_matrix, csc_matrix):
+            adjacency_matrix = adjacency_matrix.toarray()
+        return iterative_greedy_max_geom_clique_cover(adjacency_matrix, 
+                                                      vertex_positions, 
+                                                      min_gain_per_clique,
+                                                      use_two=True), None
     if approach == 'cutting':
         if isinstance(adjacency_matrix, csc_matrix):
             adjacency_matrix = adjacency_matrix.toarray()
         return cutting_planes_geometric_clique_cover(adjacency_matrix, 
                                                       vertex_positions, 
                                                       min_gain_per_clique,
-                                                      worklimit_mip)
-   
+                                                      worklimit_mip), None
+    if approach == 'ellipsoid':
+        if isinstance(adjacency_matrix, csc_matrix):
+            adjacency_matrix = adjacency_matrix.toarray()
+        return ellipsoid_geometric_clique_cover(adjacency_matrix, 
+                                                vertex_positions.T, 
+                                                min_gain_per_clique,
+                                                worklimit_mip)
     raise ValueError("Invalid approach")

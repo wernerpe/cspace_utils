@@ -21,10 +21,10 @@ def get_lj_ellipse_homogeneous_rep(pts):
     HE = Hyperellipsoid.MinimumVolumeCircumscribedEllipsoid(pts.T, rank_tol = 1e-10)
     return get_homogeneous_matrix(HE)
 
-def get_hyperellipsoid_from_homogeneous_matrix(Emat):
-    An = (np.linalg.cholesky(Emat[:-1, :-1])).T
-    center = np.linalg.solve(-Emat[:-1, :-1], Emat[-1, :-1])
-    return Hyperellipsoid(An, center)
+# def get_hyperellipsoid_from_homogeneous_matrix(Emat):
+#     An = (np.linalg.cholesky(Emat[:-1, :-1])).T
+#     center = np.linalg.solve(-Emat[:-1, :-1], Emat[-1, :-1])
+#     return Hyperellipsoid(An, center)
 
 def arrange_homogeneous_ellipse_matrix_to_vector(Emat):
     #flattens the homogenous matrix describing the ellipsoid to a vector
@@ -74,6 +74,11 @@ def get_homogeneous_matrix(E):
     Emat[-1, :dim] = Eoff.squeeze()
     Emat[-1,-1] = Econst
     return Emat
+
+def get_hyperellipsoid_from_homogeneous_ellipsoid_matrix(E):
+    center = np.linalg.solve(E[:-1, :-1], E[-1, :-1])
+    afactor = (np.linalg.cholesky(E[:-1, :-1])).T
+    return Hyperellipsoid(afactor, center)
 
 def get_AABB_limits(hpoly, dim=3):
     max_limits = []
