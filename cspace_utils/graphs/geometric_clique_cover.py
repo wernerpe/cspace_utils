@@ -24,7 +24,7 @@ def iterative_greedy_max_geom_clique_cover(adjacency_matrix,
     c = np.ones((adjacency_matrix.shape[0],))
     while not done:
         if use_two:
-            val, ind_max_clique = greedy_max_geometric_clique(adjacency_matrix, 
+            val, ind_max_clique = greedy_max_geometric_clique2(adjacency_matrix, 
                                                           vertex_positions.T,
                                                           c)
         else:

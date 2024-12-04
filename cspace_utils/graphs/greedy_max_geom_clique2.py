@@ -20,10 +20,14 @@ def update_candidates(points_added, current_candidates, adj, vk=None):
             cands.append(c)
     return cands
 
-def pick_best_verts_to_add(vk):
-    vals = [v['value'] for v in vk]
-    best_spanning_point = np.argmax(vals)
+def pick_best_verts_to_add(vk, degrees):
+    vals = np.array([v['value'] for v in vk])
+    max_val = np.max(vals)
+    cands = np.where(np.array(vals) == max_val)[0]
+    best_spanning_point = cands[np.argmax(degrees[cands])]
     wki = vk[best_spanning_point]['wki']
+    for w in wki:
+        vk[w]['value'] = 0
     return wki
 
 def check_if_clique(query, admat):
@@ -42,48 +46,58 @@ def update_vk(vk: List[Dict[str, Union[float, List[int]]]],
               pts : np.ndarray):
     
     current_best_value = 0
-    
-    #reset associated points
+    # vk = []
+    # for _ in range(len(pts)):
+    #     vk.append({'value':0, 'wki': []})
+
+    # #reset associated points
     for v in vk:
-        v['wk'] = []
-    
+        if v['value']>0:
+            v['value'] = 0
+            # v['wki'] = []
+
     non_clique_mems = [i for i in range(len(pts)) if i not in current_clique]
 
     clique_pts = (pts[current_clique]).T
     for c in candidates:
-        #TODO this may be redundant?
-        if not check_if_clique(current_clique + [c], adjacency_matrix):
-            vk[c]['value'] = -1
-            continue
-        #if c was an invalid spanning point in a previous iteration it is still invalid
+        # #TODO this may be redundant?
+        # if not check_if_clique(current_clique + [c], adjacency_matrix):
+        #     vk[c]['value'] = -1
+        #     continue
+        # if c was an invalid spanning point in a previous iteration it is still invalid
         if vk[c]['value'] == -1:
             continue
-        #check if the point cannot add value
+        
+        # check if the point cannot add value
         if degrees[c] - len(current_clique) < current_best_value:
             vk[c]['value'] = 0
             continue
+
         # Check if c is already contained in one of the wki 
         # (and therefore automatically dominated)
         for v in vk:
-            if c in v['wk']:
+            if c in v['wki']:
                vk[c]['value'] = 0
                continue
 
         #build wk_c for candidate c
-        spanning_pt = pts[c].T
+        spanning_pt = pts[c].reshape(-1,1)
         spanning_vpoly = VPolytope(np.concatenate((clique_pts, spanning_pt), axis = 1))
-        wk_c = [c]
+        wk_c = [c] #if not len(vk[c]) else [i for i in vk[c]['wki']]
         for i in non_clique_mems:
-            if spanning_vpoly.PointInSet(pts[i]) and not i==c:
-                wk_c.append(i)
-        is_valid_spanning_point = check_if_clique(current_clique + wk_c)
+            if i not in wk_c:
+                if spanning_vpoly.PointInSet(pts[i]):
+                    wk_c.append(i)
+        is_valid_spanning_point = check_if_clique(current_clique + wk_c, adjacency_matrix)
         if is_valid_spanning_point:
-            vk[c]['value'] = len(wk_c) - len(current_clique)
+            vk[c]['value'] = len(wk_c)
             if current_best_value <vk[c]['value']:
                 current_best_value = vk[c]['value']
             vk[c]['wki'] = wk_c
         else:
             vk[c]['value'] = -1
+    return vk
+
 # open ideas
 # reevaluate traversal order at every iteration (distance centered at 
 # current clique instead of mean of all points)
@@ -92,26 +106,28 @@ def update_vk(vk: List[Dict[str, Union[float, List[int]]]],
 def greedy_max_geometric_clique2(adj_mat,
                                 pts,
                                 c = None,
-                                do_n_steps_greedy = False):
+                                do_n_steps_greedy = True):
     assert adj_mat.shape[0] == pts.shape[0]
     #this only supports c = {0,1}^N
     if isinstance(adj_mat, csc_matrix):
         adj_mat = adj_mat.toarray()
 
     degrees = adj_mat.sum(axis=1)
-    degrees = degrees / (np.max(degrees)+1)
+    degrees_norm = degrees / (np.max(degrees)+1)
     distance_to_mean = np.linalg.norm(pts - np.mean(pts, axis=0).reshape(1,-1), axis =1)
     distance_to_mean = distance_to_mean / (np.max(distance_to_mean) + 1e-6)
+
     #TODO reevaluete traversal order in every iteration
-    cand_traversal_values = degrees + distance_to_mean
+    cand_traversal_values = degrees_norm #+ distance_to_mean
     candidates = np.argsort(cand_traversal_values)[::-1]
     degree_candidates = np.argsort(degrees)[::-1]
     if c is not None:
         assert len(c) == len(pts)
         #extract non zero candidates
         csorted = c[candidates]
+        csorted2 = c[degree_candidates]
         candidates = np.delete(candidates, np.where(csorted == 0)[0])
-        degree_candidates = np.delete(degree_candidates, np.where(csorted == 0)[0])
+        degree_candidates = np.delete(degree_candidates, np.where(csorted2 == 0)[0])
     original_candidates = candidates.copy()
     current_clique = []
     
@@ -125,18 +141,43 @@ def greedy_max_geometric_clique2(adj_mat,
         # Only worry about updating candidates sorted by degrees if we do all n steps of greedy clique building
         degree_candidates = update_candidates([current_clique[-1]], degree_candidates, adj_mat)
 
-    vk = [{'value':0, 'wki': []}]*len(pts)
+    vk =[] 
+    for _ in range(len(pts)):
+        vk.append({'value':0, 'wki': []})
+    
     # reuse more work when computing the vk_i make vk_i dict {int, list[int]} set already covered vk[i] = 0
     while len(candidates):
         # update values of remaining candidates
-        vk = update_vk(vk, 
-                       current_clique, 
-                       candidates,
-                       adj_mat, 
-                       degrees, 
-                       pts)
+        import cProfile, pstats, line_profiler
+        # profile = cProfile.Profile()
+        # profile.enable()
+        # vk = profile.runcall(update_vk, vk, 
+        #                current_clique, 
+        #                candidates,
+        #                adj_mat, 
+        #                degrees, 
+        #                pts)
+        # profile.disable()
+        # stats = pstats.Stats(profile)
+        # stats.sort_stats("cumulative").print_stats()
 
-        wk = pick_best_verts_to_add(vk)
+        profile = line_profiler.LineProfiler()
+        profile.add_function(update_vk)  # Add the function to profile
+
+        # Wrap your function call
+        profile.runcall(update_vk, vk, current_clique, candidates, adj_mat, degrees, pts)
+
+        # Print the results
+        profile.print_stats()
+
+        # vk = update_vk(vk, 
+        #                current_clique, 
+        #                candidates,
+        #                adj_mat, 
+        #                degrees, 
+        #                pts)
+
+        wk = pick_best_verts_to_add(vk, degrees)
         if not len(wk):
             break
 

@@ -13,7 +13,6 @@ def cutting_planes(clique, points, tol=1e-5):
     
     n, d = points.shape
     m = len(clique)
-    
     prog = MathematicalProgram()
     x = prog.NewContinuousVariables(m)
     prog.AddLinearConstraint(ge(x, 0))
@@ -22,10 +21,16 @@ def cutting_planes(clique, points, tol=1e-5):
     cost = prog.AddLinearCost(sum(x))
     solver = GurobiSolver()
     
+    # n x dim
+    clique_points = points[clique]
+
     counterexamples = []
     for i in (j for j in range(n) if j not in clique):
-        # next line is confusing but seems to do the right thing
+        # next line is confusing but seems to do the right thing  
+        # distances = np.linalg.norm(clique_points - points[i], axis = 1)
+        # np.random.randn(m)
         constr.evaluator().UpdateUpperBound(points[i])
+        # cost.evaluator().UpdateCoefficients(distances)
         cost.evaluator().UpdateCoefficients(np.random.randn(m))
         result = solver.Solve(prog)
         if result.is_success():
@@ -47,7 +52,7 @@ def max_clique_iterative_cvx_h_constraint(adj_mat, graph_vertices, c = None):
             if adj_mat[i,j] == 0:
                 prog.AddLinearConstraint(v[i] + v[j] <= 1)
     solver_options = SolverOptions()
-    solver_options.SetOption(CommonSolverOption.kPrintToConsole, 1)
+    solver_options.SetOption(CommonSolverOption.kPrintToConsole, 0)
     #solver = GurobiSolver()
     num_cuts_iters = 0
     while True:
@@ -56,12 +61,16 @@ def max_clique_iterative_cvx_h_constraint(adj_mat, graph_vertices, c = None):
         print(result.get_solver_details().optimizer_time)
         v_opt = result.GetSolution(v)
         clique = list(np.where(v_opt > .5)[0])
-        print(f'###{len(clique)}')
+        print(f'######### current clique length {len(clique)}')
+
         cuts = cutting_planes(clique, graph_vertices)
         if len(cuts) == 0:
+            print(f"######## Num cut iters {num_cuts_iters}")
             break
+        print(f"num cuts {len(cuts)}")
         for i, nonzeros in cuts:
             prog.AddLinearConstraint(v[i] >= sum(v[nonzeros]) - len(nonzeros) + 1)
+            
         num_cuts_iters +=1
         print(f"######## Num cut iters {num_cuts_iters}")
     return -result.get_optimal_cost(), np.array(clique) 

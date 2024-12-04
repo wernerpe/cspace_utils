@@ -34,6 +34,7 @@ def get_col_func(plant, plant_context, min_dist = 0.01, tol = 0.001, use_ik=True
 
 
 def sample_cfree(N, M, regions, q_min, q_diff, dim, col_func_handle):
+    np.random.seed(2)
     points = []
     it = 0
     for _ in range(N):
