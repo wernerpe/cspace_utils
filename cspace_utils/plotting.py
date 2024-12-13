@@ -223,9 +223,14 @@ def plot_point(point, meshcat_instance, name,
         RotationMatrix(), stretch_array_to_3d(point)))
 
 def plot_points(meshcat, points, name, size = 0.05, color = Rgba(0.06, 0.0, 0, 1)):
-    for i, pt in enumerate(points):
-        n_i = name+f"/pt{i}"
-        plot_point(pt, meshcat, n_i, color = color, radius=size)
+    if isinstance(color , list):
+        for i, pt in enumerate(points):
+            n_i = name+f"/pt{i}"
+            plot_point(pt, meshcat, n_i, color = color[i], radius=size)
+    else:
+        for i, pt in enumerate(points):
+            n_i = name+f"/pt{i}"
+            plot_point(pt, meshcat, n_i, color = color, radius=size)
         
 
 def plot_polytope(polytope, meshcat_instance, name,
